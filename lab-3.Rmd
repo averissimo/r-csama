@@ -1,6 +1,7 @@
 ---
 title: "R Markdown first test"
 output: html_document
+date: "It's today!! duhhhh"
 ---
 
 ```{r setup, include=FALSE}
