@@ -1,0 +1,8 @@
+Lab 3 on R Markdown
+=========
+
+This is a test to see how this looks in github
+
+----
+a <- 1 +2
+----
