@@ -1,6 +1,6 @@
 ---
 title: "R Markdown first test"
-output: html_document
+output: github_document
 date: "It's today!! duhhhh"
 ---
 
