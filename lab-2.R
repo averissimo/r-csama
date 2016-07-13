@@ -186,12 +186,154 @@ ggplot(mdsPois, aes(X1,X2,color=dex,shape=cell)) + geom_point(size=3)
 # Differential expression analysis
 # 
 
+dds <- DESeq(dds)
+# for p-values < .1
+res <- results(dds)
+mcols(res, use.names=TRUE)
+summary(res)
+table(res$padj < .1)
 
+# for p-values < .05
+res.05 <- results(dds, alpha=.05)
+summary(res.05)
 
+# raising the log2 fold change threshold
+# p-values < .1 and difference is higher than 2 and lower than 1
+resLFC1 <- results(dds, lfcThreshold=1)
+table(resLFC1$padj < .1)
+#sampleX <- 10^(-1:-20)
+#plot(1:length(sampleX),sapply(sampleX, function(p) {as.vector(table(resLFC1$padj < p)[2])}),
+#     xlab = 'p-values', ylab = 'Count of p-values'); grid()
 
+# design matrix
+#  simple with just cell line and treated/untreated
 
+y <- DGEList(counts=countdata, 
+             samples=coldata, 
+             genes=genetable)
 
+design <- model.matrix(~ cell + dex, y$samples)
+colnames(design)
+# calculate normalization factors
+y <- calcNormFactors(y)
+# calculate dispersion
+y <- estimateDisp(y, design)
 
+# calculate GLM
+fit <- glmFit(y, design)
+lrt <- glmLRT(fit, coef=ncol(design))
+tt <- topTags(lrt, n=nrow(y), p.value=.1)
+tt10 <- topTags(lrt, n=10) # just the top 10 by default
+tt10
 
+head(lrt$fitted.values)
+head(y$counts)
+head(deviance(lrt))
 
+# compare between two software overlap (DESeq2 and edgeR)
+tt.all <- topTags(lrt, n=nrow(y), sort.by="none")
+table(DESeq2=res$padj < 0.1, edgeR=tt.all$table$FDR < 0.1)
 
+# compare for fold-change threshold
+treatres <- glmTreat(fit, coef = ncol(design), lfc = 1)
+tt.treat <- topTags(treatres, n = nrow(y), sort.by = "none")
+table(DESeq2 = resLFC1$padj < 0.1, edgeR = tt.treat$table$FDR < 0.1)
+
+# rank them
+common <- !is.na(res$padj)
+plot(rank(res$padj[common]), 
+     rank(tt.all$table$FDR[common]), cex=.1,
+     xlab="DESeq2", ylab="edgeR"); grid()
+
+#
+#
+#
+# Plotting the results
+#
+
+topGene <- rownames(res)[which.min(res$padj)]
+plotCounts(dds, topGene, "dex")
+
+# MA plot for DESeq2
+DESeq2::plotMA(res, ylim=c(-5,5))
+# MA plot for edgeR
+plotSmear(lrt, de.tags=tt$table$gene.id)
+
+#
+# Heatmap of 30 most significant genes
+library("pheatmap")
+mat <- assay(vsd)[ head(order(res$padj),30), ]
+mat <- mat - rowMeans(mat)
+df <- as.data.frame(colData(vsd)[,c("cell","dex")])
+pheatmap(mat, annotation_col=df)
+
+#
+#
+#
+# Annotate genes with gene name
+# 
+library("AnnotationDbi")
+library("Homo.sapiens")
+
+columns(Homo.sapiens)
+
+# using column ensembl to map genes
+#  attention: it will show a message that should be ignored!
+res$symbol <- mapIds(Homo.sapiens,
+                     keys=row.names(res),
+                     column="SYMBOL",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+y$genes$symbol <- res$symbol
+
+res$entrez <- mapIds(Homo.sapiens,
+                     keys=row.names(res),
+                     column="ENTREZID",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+y$genes$entrez <- res$entrez
+
+res$genename <- mapIds(Homo.sapiens,
+                     keys=row.names(res),
+                     column="GENENAME",
+                     keytype="ENSEMBL",
+                     multiVals="first")
+
+y$genes$genename <- res$genename
+
+resOrdered <- res[order(res$padj),]
+head(resOrdered)
+
+# export results
+resOrderedDF <- as.data.frame(resOrdered)[seq_len(100),]
+write.csv(resOrderedDF, file="results.csv")
+
+# prettify it with html results!
+
+library("Glimma")
+glMDPlot(lrt, 
+         counts=y$counts, 
+         anno=y$genes, 
+         groups=y$samples$dex, 
+         samples=colnames(y),
+         status=tt.all$table$FDR < 0.1,
+         id.column="gene.id")
+
+# DESeq2 results
+res.df <- as.data.frame(res)
+res.df$log10MeanNormCount <- log10(res.df$baseMean)
+idx <- rowSums(counts(dds)) > 0
+res.df <- res.df[idx,]
+res.df$padj[is.na(res.df$padj)] <- 1
+glMDPlot(res.df,
+         xval="log10MeanNormCount",
+         yval="log2FoldChange",
+         counts=counts(dds)[idx,],
+         anno=data.frame(GeneID=rownames(dds)[idx]),
+         groups=dds$dex,
+         samples=colnames(dds),
+         status=res.df$padj < 0.1,
+         display.columns=c("symbol", "entrez"))
+
+# continue at: Gene set overlap analysis
