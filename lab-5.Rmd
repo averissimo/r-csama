@@ -1,0 +1,39 @@
+---
+title: 'CSAMA: Lab 5'
+output: 
+  github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+The pre-processing steps are ommited for this lab
+
+```{r}
+library(EpigeneticsCSAMA)
+dataDirectory =  system.file("bedfiles", package="EpigeneticsCSAMA")
+dataDirectory
+```
+
+### Reading ChIP-seq reads
+
+loading library 
+
+```{r}
+library(GenomicRanges)
+library(rtracklayer)
+library(IRanges)
+
+input = import.bed(file.path(dataDirectory, 'ES_input_filtered_ucsc_chr6.bed'))
+rep1 = import.bed(file.path(dataDirectory, 'H3K27ac_rep1_filtered_ucsc_chr6.bed'))
+rep2 = import.bed(file.path(dataDirectory, 'H3K27ac_rep2_filtered_ucsc_chr6.bed'))
+
+rep1
+rep2
+```
+
+
+
